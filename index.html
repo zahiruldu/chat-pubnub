@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Chat </title>
+    <script src="bower_components/angular/angular.js"></script>
+
+    <script src="bower_components/pubnub/web/pubnub.min.js"></script>
+    <script src="bower_components/pubnub-angular/dist/pubnub-angular.min.js"></script>
+    <script src="bower_components/lodash/lodash.js"></script>
+
+</head>
+<body ng-app="app">
+
+	<div ng-controller="ChatCtrl">
+
+	<ul>
+     <li ng-repeat="message in messages">
+       <img src="{{avatarUrl(message.sender_uuid)}}" alt="{{message.sender_uuid}}">
+       <span class="title">Anonymous robot #{{ message.sender_uuid }}</span>
+       <p>{{ message.date | date:"MM/dd/yyyy 'at' h:mma"}}</br> {{ message.content }}</p>
+     </li>
+</ul>
+
+     <form ng-submit="sendMessage()">
+       <input ng-model="messageContent" type="text" placeholder="Type your message" />
+       <button type="submit">Send</button>
+
+      </form>
+
+
+</div>
+
+
+
+
+
+    <script>
+    	angular.module('app', ['pubnub.angular.service'])
+ .controller('ChatCtrl', function($scope, Pubnub) {        
+   $scope.channel = 'hello';
+   // Generating a random uuid between 1 and 100 using an utility function from the lodash library.         
+   $scope.uuid = _.random(100).toString();
+     // $scope.uuid = '3784564756';
+   Pubnub.init({
+         publish_key: 'pub-c-830c2907-15e4-4920-957b-6abf3fde3384',
+         subscribe_key: 'sub-c-796e5a30-7d5a-11e6-a627-0619f8945a4f',
+         uuid: $scope.uuid
+       });
+
+       // Send the messages over PubNub Network
+    $scope.sendMessage = function() {
+       // Don't send an empty message 
+       if (!$scope.messageContent || $scope.messageContent === '') {
+            return;
+        }
+        Pubnub.publish({
+            channel: $scope.channel,
+            message: {
+                content: $scope.messageContent,
+                sender_uuid: $scope.uuid,
+                date: new Date()
+            },
+            callback: function(m) {
+                console.log(m);
+            }
+        });
+        // Reset the messageContent input
+        $scope.messageContent = '';
+
+    };
+
+    $scope.messages = [];
+
+	// Subscribing to the ‘messages-channel’ and trigering the message callback
+	Pubnub.subscribe({
+	    channel: $scope.channel,
+	    triggerEvents: ['callback']
+	});
+
+	// Listening to the callbacks
+	$scope.$on(Pubnub.getMessageEventNameFor($scope.channel), function (ngEvent, m) {
+	    $scope.$apply(function () {
+	        $scope.messages.push(m)
+	    });
+	});
+
+	// A function to display a nice uniq robot avatar 
+	$scope.avatarUrl = function(uuid){
+	    return 'http://robohash.org/'+uuid+'?set=set2&bgset=bg2&size=70x70';
+	};
+
+
+
+ });
+
+
+    </script>
+
+</body>
+</html>
